@@ -20,7 +20,6 @@ canvas{background: rgba(0,51,0,0.6); border-radius:12px; box-shadow:0 0 20px #00
 #premio{font-weight:bold;color:#ffd700;font-size:20px;margin-top:10px;text-shadow:0 0 15px #ffd700;}
 #bannerBeneficio{margin-top:15px;font-size:18px;color:#ffd700;text-shadow:0 0 15px #ffcc00; animation: blink 1s infinite;}
 @keyframes blink {0%,100%{opacity:1;}50%{opacity:0.3;}}
-/* Nuevo keyframes para temporizador palpitante */
 @keyframes blinkHeart {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.3; transform: scale(1.3); }
@@ -256,7 +255,7 @@ canvas.addEventListener("click", function(){
         if(premioJuego.includes("1 kg")){
           confetti({particleCount:200, spread:90, origin:{y:0.6}});
           let winnerText = document.createElement("div");
-          winnerText.innerText = "Tenemos Ganador\n❤️"; // <-- Texto actualizado
+          winnerText.innerHTML = "Tenemos Ganador<br>❤️";
           winnerText.style.position = "fixed";
           winnerText.style.top = "30%";
           winnerText.style.left = "50%";
@@ -267,42 +266,59 @@ canvas.addEventListener("click", function(){
           winnerText.style.zIndex = "9999";
           document.body.appendChild(winnerText);
 
-          // Iniciar temporizador
-          let tiempo = 120;
-          let timerDiv = document.getElementById("timerDiv");
-          timerDiv.innerText = `Tiempo restante: ${tiempo}s`;
-          timerDiv.style.transition = "all 0.5s ease";
-
+          // Iniciar temporizador después de desaparecer el "Ganador"
           setTimeout(()=>{
-              timerDiv.style.fontSize = "24px";
-              timerDiv.style.top = "auto";
-              timerDiv.style.bottom = "10px";
-              timerDiv.style.right = "10px";
-          },4000);
+              winnerText.remove();
 
-          let countdown = setInterval(()=>{
-              tiempo--;
+              let tiempo = 90; // 1:30 segundos
+              let timerDiv = document.getElementById("timerDiv");
               timerDiv.innerText = `Tiempo restante: ${tiempo}s`;
 
-              if(tiempo <= 60 && tiempo > 30){
-                  timerDiv.style.animation = "blinkHeart 1s infinite";
-              } else if(tiempo <= 30 && tiempo > 10){
-                  timerDiv.style.animation = "blinkHeart 0.5s infinite";
-              } else if(tiempo <= 10){
-                  timerDiv.style.animation = "blinkHeart 0.25s infinite";
-              }
+              setTimeout(()=>{ 
+                timerDiv.style.fontSize = "24px";
+                timerDiv.style.top = "auto";
+                timerDiv.style.bottom = "10px";
+                timerDiv.style.right = "10px";
+              },4000);
 
-              if(tiempo <= 0){
-                  clearInterval(countdown);
-                  timerDiv.innerText="";
-                  confetti({particleCount:300, spread:160, origin:{ y: 0.5 }});
-                  location.reload();
-              }
-          },1000);
+              let countdown = setInterval(()=>{
+                  tiempo--;
+                  timerDiv.innerText = `Tiempo restante: ${tiempo}s`;
 
-          setTimeout(()=>{ winnerText.remove(); },4000);
-          nextStep(1);
-          document.getElementById("tableroContainer").style.display="none";
+                  if(tiempo > 60){
+                      timerDiv.style.color = "#00ff00";
+                      timerDiv.style.animation = "blinkHeart 1s infinite";
+                      timerDiv.style.fontSize = "24px";
+                  } else if(tiempo <= 60 && tiempo > 30){
+                      timerDiv.style.color = "#ffff00";
+                      timerDiv.style.animation = "blinkHeart 0.5s infinite";
+                      timerDiv.style.fontSize = "24px";
+                  } else if(tiempo <= 30 && tiempo > 10){
+                      timerDiv.style.color = "#ff9900";
+                      timerDiv.style.animation = "blinkHeart 0.35s infinite";
+
+                      // Efecto grande momentáneo al llegar a 30s
+                      timerDiv.style.fontSize = "50px";
+                      setTimeout(()=>{ timerDiv.style.fontSize = "24px"; }, 1000);
+
+                  } else if(tiempo <= 10){
+                      timerDiv.style.color = "#ff0000";
+                      timerDiv.style.animation = "blinkHeart 0.25s infinite";
+                      timerDiv.style.fontSize = "30px";
+                  }
+
+                  if(tiempo <= 0){
+                      clearInterval(countdown);
+                      timerDiv.innerText="";
+                      confetti({particleCount:300, spread:160, origin:{ y: 0.5 }});
+                      location.reload();
+                  }
+              },1000);
+
+              nextStep(1);
+              document.getElementById("tableroContainer").style.display="none";
+
+          },7000); // desaparece "Ganador" después de 7s
 
         } else {
           document.getElementById("premio").innerText = `🎉 Premio final: ${premioJuego} 🎉`;
