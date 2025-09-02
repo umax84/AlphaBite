@@ -20,7 +20,12 @@ canvas{background: rgba(0,51,0,0.6); border-radius:12px; box-shadow:0 0 20px #00
 #premio{font-weight:bold;color:#ffd700;font-size:20px;margin-top:10px;text-shadow:0 0 15px #ffd700;}
 #bannerBeneficio{margin-top:15px;font-size:18px;color:#ffd700;text-shadow:0 0 15px #ffcc00; animation: blink 1s infinite;}
 @keyframes blink {0%,100%{opacity:1;}50%{opacity:0.3;}}
-#timerDiv {position:fixed; top:10px; right:10px; font-size:40px; color:#00ff00; z-index:10000;}
+/* Nuevo keyframes para temporizador palpitante */
+@keyframes blinkHeart {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(1.3); }
+}
+#timerDiv {position:fixed; top:10px; right:10px; font-size:40px; color:#00ff00; z-index:10000; transition: all 0.5s ease;}
 </style>
 </head>
 <body>
@@ -262,13 +267,37 @@ canvas.addEventListener("click", function(){
           winnerText.style.zIndex = "9999";
           document.body.appendChild(winnerText);
 
+          // Iniciar temporizador
           let tiempo = 120;
           let timerDiv = document.getElementById("timerDiv");
           timerDiv.innerText = `Tiempo restante: ${tiempo}s`;
+          timerDiv.style.transition = "all 0.5s ease";
+
+          setTimeout(()=>{
+              timerDiv.style.fontSize = "24px";
+              timerDiv.style.top = "auto";
+              timerDiv.style.bottom = "10px";
+              timerDiv.style.right = "10px";
+          },4000);
+
           let countdown = setInterval(()=>{
-            tiempo--;
-            timerDiv.innerText = `Tiempo restante: ${tiempo}s`;
-            if(tiempo<=0){ clearInterval(countdown); timerDiv.innerText=""; location.reload(); }
+              tiempo--;
+              timerDiv.innerText = `Tiempo restante: ${tiempo}s`;
+
+              if(tiempo <= 60 && tiempo > 30){
+                  timerDiv.style.animation = "blinkHeart 1s infinite";
+              } else if(tiempo <= 30 && tiempo > 10){
+                  timerDiv.style.animation = "blinkHeart 0.5s infinite";
+              } else if(tiempo <= 10){
+                  timerDiv.style.animation = "blinkHeart 0.25s infinite";
+              }
+
+              if(tiempo <= 0){
+                  clearInterval(countdown);
+                  timerDiv.innerText="";
+                  confetti({particleCount:300, spread:160, origin:{ y: 0.5 }});
+                  location.reload();
+              }
           },1000);
 
           setTimeout(()=>{ winnerText.remove(); },4000);
