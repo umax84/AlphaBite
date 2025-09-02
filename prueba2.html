@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlphaBite BARF - Plinko CasinoBarf</title>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<style>
+body {margin:0; font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:#0a0a0a; color:white; text-align:center; overflow-x:hidden;}
+.step {display:none; padding:20px;}
+.active {display:block;}
+h2 {color:#ffd700; text-shadow:0 0 15px #ffcc00;}
+.btn {background:#116d52;color:white;padding:12px 28px;margin:15px;border-radius:14px;font-weight:700;cursor:pointer;border:none;font-size:16px;box-shadow:0 0 10px #00ff66;}
+.btn:hover {background:#00ff66;color:#000;box-shadow:0 0 15px #00ff66;}
+input[type=number]{padding:10px;font-size:16px;border-radius:12px;border:2px solid #b9c2c0;width:120px;text-align:center;}
+.card{display:inline-block;background:#1a1a1a;border-radius:12px;padding:12px;margin:8px;width:120px;cursor:pointer;border:2px solid transparent;box-shadow:0 0 10px #ffd700;}
+.card.selected{border:2px solid #ffd700; box-shadow:0 0 20px #ffd700;}
+#tableroContainer{position:fixed;top:0;left:0;width:100%;height:100%; background:#003300; display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:1000;}
+canvas{background: rgba(0,51,0,0.6); border-radius:12px; box-shadow:0 0 20px #00ff66 inset;}
+#premio{font-weight:bold;color:#ffd700;font-size:20px;margin-top:10px;text-shadow:0 0 15px #ffd700;}
+#bannerBeneficio{margin-top:15px;font-size:18px;color:#ffd700;text-shadow:0 0 15px #ffcc00; animation: blink 1s infinite;}
+@keyframes blink {0%,100%{opacity:1;}50%{opacity:0.3;}}
+#timerDiv {position:fixed; top:10px; right:10px; font-size:40px; color:#00ff00; z-index:10000;}
+</style>
+</head>
+<body>
+
+<!-- Plinko -->
+<div id="tableroContainer">
+  <h2>🎉 Gana tu premio BARF! 🎉</h2>
+  <canvas id="tableroCanvas" width="320" height="480"></canvas>
+  <p id="premio">¡Haz click sobre el tablero para lanzar las pelotitas!</p>
+</div>
+
+<!-- Paso 1: Cantidad de kilos -->
+<div class="step" id="step1">
+  <h2>Cantidad de kilos</h2>
+  <input type="number" id="kilos" min="5" value="5" oninput="actualizarBannerBeneficio()">
+  <p id="bannerBeneficio"></p>
+  <br><button class="btn" onclick="nextStep(2)">Siguiente</button>
+</div>
+
+<!-- Paso 2: Tamaño de mascota -->
+<div class="step" id="step2">
+  <h2>Elige el tamaño de tu mascota</h2>
+  <div class="card" onclick="selectRaza('Pequeño',this)">Pequeño</div>
+  <div class="card" onclick="selectRaza('Mediano',this)">Mediano</div>
+  <div class="card" onclick="selectRaza('Grande',this)">Grande</div>
+  <br><button class="btn" onclick="nextStep(3)">Siguiente</button>
+</div>
+
+<!-- Paso 3: Tipo de alimento -->
+<div class="step" id="step3">
+  <h2>Tipo de alimento BARF</h2>
+  <div class="card" onclick="selectComida('Pollo',35,this)">BARF Natural Pollo</div>
+  <div class="card" onclick="selectComida('Res',45,this)">BARF Natural Res</div>
+  <div class="card" onclick="selectComida('Mixto',40,this)">BARF Natural Mixto</div>
+  <br><button class="btn" onclick="nextStep(4)">Siguiente</button>
+</div>
+
+<!-- Paso 4: Crudo o Cocido -->
+<div class="step" id="step4">
+  <h2>BARF Natural o Guiso</h2>
+  <div class="card" onclick="selectCoccion('BARF Natural',0,this)">BARF Natural</div>
+  <div class="card" onclick="selectCoccion('BARF Guiso',20,this)">BARF Guiso (+$20/kg)</div>
+  <br><button class="btn" onclick="calcularPrecio()">Calcular precio</button>
+</div>
+
+<!-- Paso 5: Precio final y WhatsApp -->
+<div class="step" id="step5">
+  <h2>Precio final</h2>
+  <p id="resumen"></p>
+  <p id="precioFinal"></p>
+  <br><button class="btn" onclick="enviarWhatsApp()">Enviar a WhatsApp</button>
+</div>
+
+<div id="timerDiv"></div>
+
+<script>
+// Variables
+let comida="", precioComida=0, coccion="", extraCoccion=0, raza="", premioJuego="";
+let pelotas = [], pelotasLanzadas = 0, totalPelotas = 3;
+
+// Premios Plinko
+const premios=[
+  {texto:"5%", prob:6},{texto:"6%", prob:7},{texto:"7%", prob:8},{texto:"8%", prob:9},{texto:"9%", prob:10},
+  {texto:"1 kg", prob:1},{texto:"9%", prob:9},{texto:"8%", prob:8},{texto:"7%", prob:7},{texto:"6%", prob:6},{texto:"5%", prob:5},
+];
+
+// Selección
+function selectRaza(r,el){raza=r; document.querySelectorAll('#step2 .card').forEach(c=>c.classList.remove('selected')); el.classList.add('selected');}
+function selectComida(c,precio,el){comida=c; precioComida=precio; document.querySelectorAll('#step3 .card').forEach(ca=>ca.classList.remove('selected')); el.classList.add('selected');}
+function selectCoccion(c,extra,el){coccion=c; extraCoccion=extra; document.querySelectorAll('#step4 .card').forEach(ca=>ca.classList.remove('selected')); el.classList.add('selected');}
+
+// Navegación
+function nextStep(n){
+  document.querySelectorAll(".step").forEach(div=>div.classList.remove("active")); 
+  document.getElementById("step"+n).classList.add("active");
+  if(n===1) actualizarBannerBeneficio();
+}
+
+// Banner dinámico
+function actualizarBannerBeneficio(){
+  let kilos = parseInt(document.getElementById("kilos").value);
+  let faltan = 10 - kilos;
+  if(faltan > 0){
+    document.getElementById("bannerBeneficio").innerText = `🎰 ¡Faltan ${faltan} kg para envío gratis y 1 kg extra de regalo! 🎰`;
+  } else{
+    document.getElementById("bannerBeneficio").innerText = `🎉 ¡Felicidades! Has alcanzado envío gratis y 1 kg extra de alimento para tu mascota. 🎉`;
+  }
+}
+
+// Calcular precio
+function calcularPrecio(){
+  let kilos = parseFloat(document.getElementById("kilos").value);
+  let precioBase = (precioComida + extraCoccion) * kilos;
+  let descuento = 0;
+  if(premioJuego.includes("%")) descuento = parseInt(premioJuego)/100;
+  let precioFinal = precioBase*(1-descuento);
+  let kgGratis = 0;
+  if(premioJuego.includes("1 kg")) kgGratis += 1;
+
+  document.getElementById("resumen").innerText = `${kilos} kg de ${comida} (${coccion}) para ${raza}\nPremio Plinko: ${premioJuego}\nKilos gratis: ${kgGratis}`;
+  document.getElementById("precioFinal").innerText = `Precio final a pagar: $${precioFinal.toFixed(2)} MXN`;
+
+  nextStep(5);
+}
+
+// WhatsApp
+function enviarWhatsApp(){
+  let kilos = parseFloat(document.getElementById("kilos").value);
+  let precio = document.getElementById("precioFinal").innerText;
+  let mensaje = `Pedido confirmado: ${kilos} kg de ${comida} (${coccion}) para ${raza}\nPremio: ${premioJuego}\n${precio}\n`;
+  if(kilos >= 10){
+    mensaje += "¡Además se donará 1 kg de comida a perritos/gatitos de la calle!\nMención en un video corto en TikTok. Síguenos para ver más.";
+  }
+
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      mensaje += `\nUbicación: https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;
+      window.location.href=`https://wa.me/5218121593597?text=${encodeURIComponent(mensaje)}`;
+    },()=>{
+      let manual = prompt("No se pudo obtener ubicación. Ingresa tu dirección:");
+      if(manual) mensaje += `\nUbicación: ${manual}`;
+      window.location.href=`https://wa.me/5218121593597?text=${encodeURIComponent(mensaje)}`;
+    });
+  } else {
+    let manual = prompt("Ingresa tu dirección:");
+    if(manual) mensaje += `\nUbicación: ${manual}`;
+    window.location.href=`https://wa.me/5218121593597?text=${encodeURIComponent(mensaje)}`;
+  }
+}
+
+// Plinko
+const canvas = document.getElementById("tableroCanvas");
+const ctx = canvas.getContext("2d");
+const posteRadius = 5, filaPostes=10, colPostes=7;
+let postes=[];
+
+for(let r=0;r<filaPostes;r++){
+  postes[r]=[];
+  for(let c=0;c<colPostes;c++){
+    let x = (canvas.width/(colPostes))*(c+0.5) + (r%2)*(canvas.width/colPostes/2);
+    let y = 50 + r*40;
+    postes[r][c]={x:x,y:y};
+  }
+}
+
+function dibujarTablero(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(let r=0;r<filaPostes;r++){
+    for(let c=0;c<colPostes;c++){
+      ctx.fillStyle="#00f";
+      ctx.beginPath();
+      ctx.arc(postes[r][c].x,postes[r][c].y,posteRadius,0,2*Math.PI);
+      ctx.fill();
+    }
+  }
+  const baseY = canvas.height - 40;
+  const widthSlot = canvas.width/premios.length;
+  for(let i=0;i<premios.length;i++){
+    ctx.fillStyle="#ffd700";
+    ctx.fillRect(i*widthSlot,baseY,widthSlot,40);
+    ctx.fillStyle="#000";
+    ctx.font="12px Arial";
+    ctx.textAlign="center";
+    ctx.fillText(premios[i].texto,i*widthSlot + widthSlot/2,baseY + 25);
+  }
+}
+
+function Pelota(){
+  this.x = canvas.width/2;
+  this.y = 10;
+  this.vy = 2;
+  this.vx = 0;
+  this.radius = 6;
+  this.fall = true;
+  this.slot = 0;
+}
+
+Pelota.prototype.update = function(){
+  if(this.fall){
+    this.vy += 0.05; this.y += this.vy; this.x += this.vx;
+    for(let r=0;r<filaPostes;r++){
+      for(let c=0;c<colPostes;c++){
+        let dx = this.x - postes[r][c].x;
+        let dy = this.y - postes[r][c].y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist < this.radius + posteRadius){
+          this.vx = (Math.random()-0.5)*4;
+          this.vy *= 0.8;
+        }
+      }
+    }
+    if(this.y + this.radius >= canvas.height - 40){
+      this.fall = false;
+      const slotWidth = canvas.width/premios.length;
+      this.slot = Math.min(Math.floor(this.x / slotWidth), premios.length-1);
+      this.y = canvas.height - 40 - this.radius;
+    }
+    if(this.x - this.radius <0) { this.x=this.radius; this.vx*=-1; }
+    if(this.x + this.radius > canvas.width) { this.x=canvas.width-this.radius; this.vx*=-1;}
+  }
+}
+
+Pelota.prototype.draw = function(){
+  ctx.fillStyle="#00f";
+  ctx.beginPath();
+  ctx.arc(this.x,this.y,this.radius,0,2*Math.PI);
+  ctx.fill();
+}
+
+canvas.addEventListener("click", function(){
+  if(pelotasLanzadas >= totalPelotas) return;
+  pelotas.push(new Pelota());
+  pelotasLanzadas++;
+  let anim = setInterval(()=>{
+    dibujarTablero();
+    let allStopped = true;
+    pelotas.forEach(p=>{p.update(); p.draw(); if(p.fall) allStopped=false;});
+    if(allStopped){
+      clearInterval(anim);
+      if(pelotasLanzadas === totalPelotas){
+        let premiosObtenidos = pelotas.map(p=>premios[p.slot].texto);
+        let premioMayor = premiosObtenidos.reduce((a,b)=>{
+          if(a.includes("kg") || b.includes("kg")) return a.includes("kg")?a:b;
+          return parseInt(a) > parseInt(b)?a:b;
+        });
+        premioJuego = premioMayor;
+
+        if(premioJuego.includes("1 kg")){
+          confetti({particleCount:200, spread:90, origin:{y:0.6}});
+          let winnerText = document.createElement("div");
+          winnerText.innerText = "🎉 WINNER 🎉\n1 kg extra será donado a perritos/gatitos de la calle!";
+          winnerText.style.position = "fixed";
+          winnerText.style.top = "30%";
+          winnerText.style.left = "50%";
+          winnerText.style.transform = "translate(-50%, -50%)";
+          winnerText.style.fontSize = "60px";
+          winnerText.style.color = "#ff0000";
+          winnerText.style.textShadow = "0 0 20px #fff, 0 0 30px #ff0";
+          winnerText.style.zIndex = "9999";
+          document.body.appendChild(winnerText);
+
+          let tiempo = 120;
+          let timerDiv = document.getElementById("timerDiv");
+          timerDiv.innerText = `Tiempo restante: ${tiempo}s`;
+          let countdown = setInterval(()=>{
+            tiempo--;
+            timerDiv.innerText = `Tiempo restante: ${tiempo}s`;
+            if(tiempo<=0){ clearInterval(countdown); timerDiv.innerText=""; location.reload(); }
+          },1000);
+
+          setTimeout(()=>{ winnerText.remove(); },4000);
+          nextStep(1);
+          document.getElementById("tableroContainer").style.display="none";
+
+        } else {
+          document.getElementById("premio").innerText = `🎉 Premio final: ${premioJuego} 🎉`;
+          setTimeout(()=>{ nextStep(1); document.getElementById("tableroContainer").style.display="none"; },1200);
+        }
+      }
+    }
+  },16);
+});
+
+dibujarTablero();
+</script>
+
+</body>
+</html>
